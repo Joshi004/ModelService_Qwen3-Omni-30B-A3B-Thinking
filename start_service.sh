@@ -56,9 +56,9 @@ else
         mkdir -p "$MEDIA_DIR"
     fi
     
-    # Start Python HTTP server in background
+    # Start Python HTTP server in background with nohup for proper detachment
     cd "$MEDIA_DIR"
-    python3 -m http.server $MEDIA_PORT > /tmp/media_server.log 2>&1 &
+    nohup python3 -m http.server $MEDIA_PORT > /tmp/media_server.log 2>&1 &
     MEDIA_SERVER_PID=$!
     echo $MEDIA_SERVER_PID > /tmp/media_server.pid
     echo -e "${GREEN}HTTP server started with PID: $MEDIA_SERVER_PID${NC}"
@@ -68,8 +68,19 @@ else
     # Return to service directory
     cd /home/naresh/qwen3-omni-service
     
-    # Give the HTTP server a moment to start
-    sleep 2
+    # Give the HTTP server a moment to start and verify it's running
+    sleep 3
+    
+    # Verify the server is actually running
+    if lsof -Pi :$MEDIA_PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+        echo -e "${GREEN}HTTP server verified running on port $MEDIA_PORT${NC}"
+    else
+        echo -e "${YELLOW}Warning: HTTP server may not have started properly. Check /tmp/media_server.log${NC}"
+        if [ -f /tmp/media_server.log ]; then
+            echo "  Last few lines of server log:"
+            tail -5 /tmp/media_server.log | sed 's/^/    /'
+        fi
+    fi
 fi
 
 echo ""
