@@ -7,9 +7,46 @@ It demonstrates how to interact with the Qwen3-Omni model via the OpenAI-compati
 """
 
 import json
+import re
 import requests
 import sys
 from typing import Optional
+
+
+def remove_thinking_tags(text: str) -> str:
+    """
+    Remove thinking/reasoning tags from the model output.
+    
+    This function strips out common thinking patterns like:
+    - <think>...</think>
+    - <reasoning>...</reasoning>
+    - Content before "Answer:" or similar markers
+    
+    Args:
+        text: Raw output from the model
+        
+    Returns:
+        str: Cleaned text with only the final answer
+    """
+    # Pattern 1: Remove <think>...</think> tags
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    
+    # Pattern 2: Remove <reasoning>...</reasoning> tags
+    text = re.sub(r'<reasoning>.*?</reasoning>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    
+    # Pattern 3: Extract content after "Answer:" or "Final Answer:" markers
+    answer_match = re.search(r'(?:Final\s+)?Answer\s*:\s*(.*)', text, flags=re.DOTALL | re.IGNORECASE)
+    if answer_match:
+        text = answer_match.group(1)
+    
+    # Pattern 4: Remove markdown code blocks with "thinking" label
+    text = re.sub(r'```thinking.*?```', '', text, flags=re.DOTALL)
+    
+    # Clean up extra whitespace
+    text = re.sub(r'\n\s*\n', '\n\n', text)
+    text = text.strip()
+    
+    return text
 
 
 def test_service(
@@ -20,6 +57,7 @@ def test_service(
     top_p: float = 0.95,
     top_k: int = 20,
     max_tokens: int = 16384,
+    strip_thinking: bool = True,
 ):
     """
     Test the Qwen3-Omni service with a video URL and prompt.
@@ -32,6 +70,7 @@ def test_service(
         top_p: Top-p sampling parameter
         top_k: Top-k sampling parameter
         max_tokens: Maximum tokens to generate
+        strip_thinking: Whether to remove thinking/reasoning tags from output
     
     Returns:
         dict: Response from the service
@@ -79,7 +118,17 @@ def test_service(
         # Extract generated text
         if "choices" in result and len(result["choices"]) > 0:
             generated_text = result["choices"][0]["message"]["content"]
-            print("✅ Response received!")
+            
+            # Store raw output
+            raw_output = generated_text
+            
+            # Optionally strip thinking tags
+            if strip_thinking:
+                generated_text = remove_thinking_tags(generated_text)
+                print("✅ Response received! (Thinking tags removed)")
+            else:
+                print("✅ Response received! (Raw output with thinking)")
+            
             print("-" * 80)
             print("📝 Generated Caption:")
             print(generated_text)
@@ -91,10 +140,18 @@ def test_service(
                 print(f"   Prompt tokens: {result['usage'].get('prompt_tokens', 'N/A')}")
                 print(f"   Completion tokens: {result['usage'].get('completion_tokens', 'N/A')}")
                 print(f"   Total tokens: {result['usage'].get('total_tokens', 'N/A')}")
+                
+                # Show token savings if thinking was stripped
+                if strip_thinking and raw_output != generated_text:
+                    raw_tokens = len(raw_output.split())  # Rough estimate
+                    clean_tokens = len(generated_text.split())
+                    saved_tokens = raw_tokens - clean_tokens
+                    print(f"   💡 Estimated tokens saved: ~{saved_tokens} (by removing thinking)")
             
             return {
                 "success": True,
                 "response": generated_text,
+                "raw_response": raw_output,
                 "full_response": result
             }
         else:

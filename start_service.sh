@@ -36,32 +36,34 @@ TENSOR_PARALLEL_SIZE=2  # Using 2x H100 GPUs
 GPU_MEMORY_UTIL=0.95
 MAX_NUM_SEQS=8
 
-# Video server configuration
-VIDEO_DIR="/home/naresh/datasets/videos"
-VIDEO_PORT=8080
+# Media server configuration - serves both videos/ and audios/ subdirectories
+MEDIA_DIR="/home/naresh/datasets"
+MEDIA_PORT=8080
 
 # Check if port 8080 is already in use
-if lsof -Pi :$VIDEO_PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then
-    echo -e "${YELLOW}HTTP server already running on port $VIDEO_PORT - reusing existing server${NC}"
-    echo "  Media files accessible at: http://localhost:$VIDEO_PORT/"
+if lsof -Pi :$MEDIA_PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+    echo -e "${YELLOW}HTTP server already running on port $MEDIA_PORT - reusing existing server${NC}"
+    echo "  Media files accessible at: http://localhost:$MEDIA_PORT/"
 else
-    echo -e "${GREEN}Starting HTTP server for video/audio files...${NC}"
-    echo "  Directory: $VIDEO_DIR"
-    echo "  Port: $VIDEO_PORT"
+    echo -e "${GREEN}Starting HTTP server for media files...${NC}"
+    echo "  Directory: $MEDIA_DIR"
+    echo "  Port: $MEDIA_PORT"
+    echo "  Serving: videos/, audios/, and other subdirectories"
     
-    # Check if video directory exists
-    if [ ! -d "$VIDEO_DIR" ]; then
-        echo -e "${YELLOW}Warning: Directory $VIDEO_DIR does not exist. Creating it...${NC}"
-        mkdir -p "$VIDEO_DIR"
+    # Check if media directory exists
+    if [ ! -d "$MEDIA_DIR" ]; then
+        echo -e "${YELLOW}Warning: Directory $MEDIA_DIR does not exist. Creating it...${NC}"
+        mkdir -p "$MEDIA_DIR"
     fi
     
     # Start Python HTTP server in background
-    cd "$VIDEO_DIR"
-    python3 -m http.server $VIDEO_PORT > /tmp/video_server.log 2>&1 &
-    VIDEO_SERVER_PID=$!
-    echo $VIDEO_SERVER_PID > /tmp/video_server.pid
-    echo -e "${GREEN}HTTP server started with PID: $VIDEO_SERVER_PID${NC}"
-    echo "  Media URLs: http://localhost:$VIDEO_PORT/<filename>"
+    cd "$MEDIA_DIR"
+    python3 -m http.server $MEDIA_PORT > /tmp/media_server.log 2>&1 &
+    MEDIA_SERVER_PID=$!
+    echo $MEDIA_SERVER_PID > /tmp/media_server.pid
+    echo -e "${GREEN}HTTP server started with PID: $MEDIA_SERVER_PID${NC}"
+    echo "  Video URLs: http://localhost:$MEDIA_PORT/videos/<filename>"
+    echo "  Audio URLs: http://localhost:$MEDIA_PORT/audios/<filename>"
     
     # Return to service directory
     cd /home/naresh/qwen3-omni-service
